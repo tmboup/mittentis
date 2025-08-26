@@ -1,0 +1,156 @@
+CREATE TABLE mesures( 
+    id INTEGER primary key autoincrement, 
+    sensor_id INTEGER, data_type INTEGER, 
+    value INTEGER, sent INTEGER default 0, 
+    received INTEGER default 0, 
+    unix_ts DATETIME DEFAULT CURRENT_TIMESTAMP
+    
+    )
+
+var sql = "create table IF NOT EXISTS mesures( id INTEGER primary key autoincrement, 
+                                                sensor_id INTEGER, data_type INTEGER, 
+                                                value INTEGER, sent INTEGER default 0, 
+                                                received INTEGER default 0, 
+                                                unix_ts DATETIME DEFAULT CURRENT_TIMESTAMP
+                                                )" ;
+
+
+
+
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+def get_latest_mesures():
+    conn = psycopg2.connect(os.getenv("DB_LOCAL_URL"))
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute(""" SELECT id, created_at, date, parameter, unit, updated_at, value, sensor_id FROM mesure WHERE sent IS FALSE OR sent IS NULL """)
+    rows = cur.fetchall()
+    
+    # Optionnel : marquer comme envoyées ici ou plus tard après succès
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return rows
+
+
+####################################################################################################################################################################################
+
+
+* exécute ton programme toutes les 4 heures,
+* redémarre automatiquement si le serveur redémarre,
+* gère les logs et les erreurs proprement.
+
+La **meilleure pratique sous Ubuntu** n’est pas `cron` (trop limité en redémarrage et monitoring), mais **systemd timers**. C’est moderne, fiable, relance après reboot et gère les logs avec `journalctl`.
+
+---
+
+## 🚀 Étapes pour déployer ton script avec systemd timer
+
+### 1. Crée un script exécutable
+
+Disons que ton code est dans `sync_data.py`.
+
+👉 Crée un wrapper shell `/usr/local/bin/sync_data.sh` :
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# Activer l’environnement Python si besoin
+# source /home/tonuser/venv/bin/activate
+
+# Exécuter ton script et capturer les logs
+python3 /home/tonuser/projet/sync_data.py >> /var/log/sync_data.log 2>&1
+```
+
+Puis rends-le exécutable :
+
+```bash
+chmod +x /usr/local/bin/sync_data.sh
+```
+
+---
+
+### 2. Crée un service systemd
+
+Fichier : `/etc/systemd/system/sync_data.service`
+
+```ini
+[Unit]
+Description=Synchronisation des mesures locales vers la base distante
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sync_data.sh
+# Relance automatique si crash
+Restart=on-failure
+RestartSec=10
+```
+
+---
+
+### 3. Crée un timer systemd
+
+Fichier : `/etc/systemd/system/sync_data.timer`
+
+```ini
+[Unit]
+Description=Timer pour sync_data toutes les 4 heures
+
+[Timer]
+# Lancer toutes les 4 heures
+OnCalendar=*:0/4
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+> ✅ `Persistent=true` → si la machine était éteinte pendant une exécution, systemd exécute le job dès le redémarrage pour rattraper. (Ce que `cron` ne fait pas).
+
+---
+
+### 4. Active et démarre
+
+```bash
+# Recharger systemd
+sudo systemctl daemon-reload
+
+# Activer le timer
+sudo systemctl enable --now sync_data.timer
+
+# Vérifier
+systemctl list-timers | grep sync_data
+```
+
+---
+
+### 5. Logs et suivi
+
+Voir les logs en temps réel :
+
+```bash
+journalctl -u sync_data.service -f
+```
+
+Ou lire les logs enregistrés :
+
+```bash
+cat /var/log/sync_data.log
+```
+
+---
+
+## ✅ Avantages de cette approche
+
+* **Tolérance aux fautes** : si le script crash → relance.
+* **Persistance** : si la machine redémarre → le job continue automatiquement.
+* **Fiabilité** : `systemd` est plus robuste que `cron`.
+* **Debug facile** : logs centralisés (`journalctl`).
+
+---
+
+👉 Veux-tu que je t’écrive aussi une **version "safe" de ton `sync_data.py`** (avec gestion des exceptions, logs robustes, retry si le serveur distant est down), pour que le déploiement soit vraiment **premium++** ?
