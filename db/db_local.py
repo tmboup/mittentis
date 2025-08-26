@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 
-DB_PATH = "mesures.db"
+DB_PATH = "/opt/vmbase/scripts/mesures.db"
 
 @contextmanager
 def get_local_conn():

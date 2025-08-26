@@ -36,7 +36,7 @@ def get_latest_mesures():
 
 
 ####################################################################################################################################################################################
-
+6`
 
 * exécute ton programme toutes les 4 heures,
 * redémarre automatiquement si le serveur redémarre,
