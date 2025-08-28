@@ -2,7 +2,7 @@ import sqlite3
 import time
 
 # Connexion à la base locale
-conn = sqlite3.connect("mesures.db")
+conn = sqlite3.connect("/opt/vmbase/scripts/mesures.db")
 cursor = conn.cursor()
 
 # Exemple de données à insérer

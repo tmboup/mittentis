@@ -2,6 +2,7 @@ import os
 import psycopg2
 from contextlib import contextmanager
 from dotenv import load_dotenv
+from typing import List, Dict  # ✅ nécessaire pour Python < 3.9
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -14,7 +15,7 @@ def get_remote_conn():
     finally:
         conn.close()
 
-def insert_mesures(mesures: list[dict]):
+def insert_mesures(mesures: List[Dict]):
     """
     Insère une liste de mesures dans la base distante PostgreSQL
     mesures = [
